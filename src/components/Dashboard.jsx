@@ -1,20 +1,21 @@
 import { useState } from 'react';
-import { getDaysOld, getTodayKey } from '../utils/dates.js';
+import { getDaysOld, getDueDate, getTodayKey } from '../utils/dates.js';
 import { getLoggedToday, addReps, getHistory, clearAll } from '../utils/storage.js';
 import { getMilestone } from '../data/milestones.js';
 import ProgressRing from './ProgressRing.jsx';
 import LogInput from './LogInput.jsx';
 import HistoryList from './HistoryList.jsx';
 
-export default function Dashboard({ conceptionDate, onReset }) {
+export default function Dashboard({ lmpDate, cycleLength, onReset }) {
   const todayKey = getTodayKey();
-  const daysOld = getDaysOld(conceptionDate);
+  const daysOld = getDaysOld(lmpDate, cycleLength);
   const target = daysOld;
   const [logged, setLogged] = useState(() => getLoggedToday(todayKey));
   const [history, setHistory] = useState(() => getHistory());
   const remaining = Math.max(target - logged, 0);
   const isComplete = logged >= target && target > 0;
   const isDayZero = target === 0;
+  const dueDate = getDueDate(lmpDate, cycleLength);
 
   function handleLog(reps) {
     const newTotal = addReps(todayKey, reps);
@@ -62,9 +63,20 @@ export default function Dashboard({ conceptionDate, onReset }) {
         </div>
 
         {/* Milestone */}
-        <p className="italic text-sm mb-4" style={{ color: '#7d8068', fontFamily: font }}>
+        <p className="italic text-sm mb-1" style={{ color: '#7d8068', fontFamily: font }}>
           {getMilestone(daysOld)}
         </p>
+
+        {/* Due Date */}
+        {dueDate && (
+          <p className="text-xs mb-4" style={{ color: '#6b6e5a', fontFamily: font }}>
+            {dueDate.daysUntil > 0
+              ? `📅 Due ${dueDate.dateStr} — ${dueDate.daysUntil} days to go`
+              : dueDate.daysUntil === 0
+                ? `📅 Due today!`
+                : `📅 Due date was ${dueDate.dateStr}`}
+          </p>
+        )}
 
         {isDayZero ? (
           /* Day Zero */
@@ -120,7 +132,7 @@ export default function Dashboard({ conceptionDate, onReset }) {
       </div>
 
       {/* History */}
-      <HistoryList history={history} conceptionDate={conceptionDate} todayKey={todayKey} />
+      <HistoryList history={history} lmpDate={lmpDate} cycleLength={cycleLength} todayKey={todayKey} />
 
       {/* Reset */}
       <button

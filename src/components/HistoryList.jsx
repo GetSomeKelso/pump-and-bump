@@ -1,7 +1,7 @@
-import { getDaysOld } from '../utils/dates.js';
+import { getDaysOldOn } from '../utils/dates.js';
 import { formatDate } from '../utils/dates.js';
 
-export default function HistoryList({ history, conceptionDate, todayKey }) {
+export default function HistoryList({ history, lmpDate, cycleLength, todayKey }) {
   const days = Object.keys(history)
     .filter((key) => key !== todayKey)
     .sort((a, b) => b.localeCompare(a))
@@ -16,11 +16,7 @@ export default function HistoryList({ history, conceptionDate, todayKey }) {
       </h3>
       <div className="flex flex-col gap-2">
         {days.map((dateKey) => {
-          const dayDate = new Date(dateKey + 'T00:00:00');
-          const concDate = new Date(conceptionDate);
-          concDate.setHours(0, 0, 0, 0);
-          dayDate.setHours(0, 0, 0, 0);
-          const goal = Math.floor((dayDate - concDate) / (1000 * 60 * 60 * 24));
+          const goal = getDaysOldOn(dateKey, lmpDate, cycleLength);
           const logged = history[dateKey]?.logged ?? 0;
           const complete = logged >= goal;
 

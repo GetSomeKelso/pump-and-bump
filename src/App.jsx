@@ -1,23 +1,29 @@
 import { useState } from 'react';
 import SetupScreen from './components/SetupScreen.jsx';
 import Dashboard from './components/Dashboard.jsx';
-import { getConceptionDate, setConceptionDate } from './utils/storage.js';
+import { getSetup, saveSetup } from './utils/storage.js';
 
 export default function App() {
-  const [conceptionDate, setDate] = useState(() => getConceptionDate());
+  const [setup, setSetup] = useState(() => getSetup());
 
-  function handleSetup(date) {
-    setConceptionDate(date);
-    setDate(date);
+  function handleSetup(lmpDate, cycleLength) {
+    saveSetup(lmpDate, cycleLength);
+    setSetup({ lmpDate, cycleLength });
   }
 
   function handleReset() {
-    setDate(null);
+    setSetup(null);
   }
 
-  if (!conceptionDate) {
+  if (!setup) {
     return <SetupScreen onComplete={handleSetup} />;
   }
 
-  return <Dashboard conceptionDate={conceptionDate} onReset={handleReset} />;
+  return (
+    <Dashboard
+      lmpDate={setup.lmpDate}
+      cycleLength={setup.cycleLength}
+      onReset={handleReset}
+    />
+  );
 }

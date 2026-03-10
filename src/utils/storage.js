@@ -7,9 +7,21 @@ function load() {
     if (!raw) return null;
     const data = JSON.parse(raw);
     if (typeof data !== 'object' || data === null) return null;
-    // Validate conceptionDate
-    if (data.conceptionDate && (typeof data.conceptionDate !== 'string' || !DATE_RE.test(data.conceptionDate))) {
-      data.conceptionDate = null;
+
+    // Migrate legacy conceptionDate → lmpDate (treat as LMP with 28-day cycle)
+    if (data.conceptionDate && !data.lmpDate) {
+      data.lmpDate = data.conceptionDate;
+      data.cycleLength = 28;
+      delete data.conceptionDate;
+    }
+
+    // Validate lmpDate
+    if (data.lmpDate && (typeof data.lmpDate !== 'string' || !DATE_RE.test(data.lmpDate))) {
+      data.lmpDate = null;
+    }
+    // Validate cycleLength
+    if (typeof data.cycleLength !== 'number' || !Number.isFinite(data.cycleLength) || data.cycleLength < 20 || data.cycleLength > 45) {
+      data.cycleLength = 28;
     }
     // Validate history entries
     if (data.history && typeof data.history === 'object') {
@@ -35,13 +47,16 @@ function save(data) {
   }
 }
 
-export function getConceptionDate() {
-  return load()?.conceptionDate ?? null;
+export function getSetup() {
+  const data = load();
+  if (!data?.lmpDate) return null;
+  return { lmpDate: data.lmpDate, cycleLength: data.cycleLength ?? 28 };
 }
 
-export function setConceptionDate(date) {
+export function saveSetup(lmpDate, cycleLength) {
   const data = load() || {};
-  data.conceptionDate = date;
+  data.lmpDate = lmpDate;
+  data.cycleLength = cycleLength;
   if (!data.history) data.history = {};
   save(data);
 }
