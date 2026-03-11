@@ -1,26 +1,48 @@
 import { useState } from 'react';
-import { getDaysOld, getDueDate, getTodayKey } from '../utils/dates.js';
+import { getDaysOld, getDaysOldOn, getDueDate, getTodayKey, formatDate } from '../utils/dates.js';
 import { getLoggedToday, addReps, getHistory, clearAll } from '../utils/storage.js';
 import { getMilestone } from '../data/milestones.js';
 import ProgressRing from './ProgressRing.jsx';
 import LogInput from './LogInput.jsx';
-import HistoryList from './HistoryList.jsx';
+import CalendarView from './CalendarView.jsx';
 
 export default function Dashboard({ lmpDate, cycleLength, onReset }) {
   const todayKey = getTodayKey();
-  const daysOld = getDaysOld(lmpDate, cycleLength);
-  const target = daysOld;
   const [logged, setLogged] = useState(() => getLoggedToday(todayKey));
   const [history, setHistory] = useState(() => getHistory());
-  const remaining = Math.max(target - logged, 0);
-  const isComplete = logged >= target && target > 0;
-  const isDayZero = target === 0;
-  const dueDate = getDueDate(lmpDate, cycleLength);
+  const [selectedDate, setSelectedDate] = useState(null);
 
+  const dueDate = getDueDate(lmpDate, cycleLength);
+  const font = "Georgia, 'Times New Roman', serif";
+
+  /* ── Derive display values from selected date or today ── */
+  const viewingDate = selectedDate || todayKey;
+  const isViewingToday = viewingDate === todayKey;
+
+  const daysOld = isViewingToday
+    ? getDaysOld(lmpDate, cycleLength)
+    : getDaysOldOn(viewingDate, lmpDate, cycleLength);
+
+  const target = daysOld;
+  const viewLogged = isViewingToday ? logged : (history[viewingDate]?.logged ?? 0);
+  const isComplete = viewLogged >= target && target > 0;
+  const isDayZero = target === 0;
+
+  /* ── Handlers ── */
   function handleLog(reps) {
-    const newTotal = addReps(todayKey, reps);
-    setLogged(newTotal);
+    addReps(viewingDate, reps);
+    if (isViewingToday) {
+      setLogged(getLoggedToday(todayKey));
+    }
     setHistory(getHistory());
+  }
+
+  function handleSelectDate(dateKey) {
+    setSelectedDate((prev) => (prev === dateKey ? null : dateKey));
+  }
+
+  function handleBackToToday() {
+    setSelectedDate(null);
   }
 
   function handleReset() {
@@ -29,8 +51,6 @@ export default function Dashboard({ lmpDate, cycleLength, onReset }) {
       onReset();
     }
   }
-
-  const font = "Georgia, 'Times New Roman', serif";
 
   return (
     <div
@@ -49,6 +69,22 @@ export default function Dashboard({ lmpDate, cycleLength, onReset }) {
         className="bg-white rounded-2xl shadow-lg p-6 w-full max-w-sm text-center"
         style={{ border: '1px solid #c2c1a5' }}
       >
+        {/* Viewing past date banner */}
+        {!isViewingToday && (
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-bold" style={{ color: '#556b2f', fontFamily: font }}>
+              {formatDate(viewingDate)}
+            </span>
+            <button
+              onClick={handleBackToToday}
+              className="text-xs font-bold rounded-lg px-3 py-1 cursor-pointer border-none"
+              style={{ background: '#f7f7f2', color: '#556b2f', fontFamily: font }}
+            >
+              ← Today
+            </button>
+          </div>
+        )}
+
         {/* Days Old Badge */}
         <div className="mb-1">
           <span
@@ -58,7 +94,7 @@ export default function Dashboard({ lmpDate, cycleLength, onReset }) {
             {daysOld}
           </span>
           <span className="text-sm" style={{ color: '#6b6e5a', fontFamily: font }}>
-            days old
+            {isViewingToday ? 'days old' : 'days old then'}
           </span>
         </div>
 
@@ -67,8 +103,8 @@ export default function Dashboard({ lmpDate, cycleLength, onReset }) {
           {getMilestone(daysOld)}
         </p>
 
-        {/* Due Date */}
-        {dueDate && (
+        {/* Due Date — only show when viewing today */}
+        {isViewingToday && dueDate && (
           <p className="text-xs mb-4" style={{ color: '#6b6e5a', fontFamily: font }}>
             {dueDate.daysUntil > 0
               ? `📅 Due ${dueDate.dateStr} — ${dueDate.daysUntil} days to go`
@@ -78,20 +114,22 @@ export default function Dashboard({ lmpDate, cycleLength, onReset }) {
           </p>
         )}
 
+        {/* Spacer when due date is hidden */}
+        {!isViewingToday && <div className="mb-4" />}
+
         {isDayZero ? (
-          /* Day Zero */
           <div
             className="rounded-xl px-4 py-6 mb-4"
             style={{ background: '#f7f7f2', border: '1px solid #c2c1a5' }}
           >
             <p className="text-lg font-bold" style={{ color: '#556b2f', fontFamily: font }}>
-              Rest day — it's day zero!
+              Rest day — {isViewingToday ? "it's day zero!" : 'day zero'}
             </p>
           </div>
         ) : (
           <>
             {/* Progress Ring */}
-            <ProgressRing target={target} logged={logged} />
+            <ProgressRing target={target} logged={viewLogged} />
 
             {/* Stats Row */}
             <div className="flex justify-center items-center gap-6 mb-4">
@@ -100,13 +138,13 @@ export default function Dashboard({ lmpDate, cycleLength, onReset }) {
                   {target}
                 </span>
                 <span className="text-xs" style={{ color: '#6b6e5a', fontFamily: font }}>
-                  Today's Goal
+                  {isViewingToday ? "Today's Goal" : 'Goal'}
                 </span>
               </div>
               <div style={{ width: '1px', height: '40px', background: '#c2c1a5' }} />
               <div className="text-center">
                 <span className="block font-bold" style={{ fontSize: '30px', color: '#2a2e1f', fontFamily: font }}>
-                  {logged}
+                  {viewLogged}
                 </span>
                 <span className="text-xs" style={{ color: '#6b6e5a', fontFamily: font }}>
                   Completed
@@ -121,7 +159,9 @@ export default function Dashboard({ lmpDate, cycleLength, onReset }) {
                 style={{ background: '#e8efe0', border: '1px solid #6b8f3c' }}
               >
                 <p className="text-base font-bold" style={{ color: '#3d5a1e', fontFamily: font }}>
-                  🎉 Crushed it, Dad. That's {logged} reps for your little one.
+                  {isViewingToday
+                    ? `🎉 Crushed it, Dad. That's ${viewLogged} reps for your little one.`
+                    : `✓ ${viewLogged}/${target} reps completed`}
                 </p>
               </div>
             ) : (
@@ -131,8 +171,15 @@ export default function Dashboard({ lmpDate, cycleLength, onReset }) {
         )}
       </div>
 
-      {/* History */}
-      <HistoryList history={history} lmpDate={lmpDate} cycleLength={cycleLength} todayKey={todayKey} />
+      {/* Calendar */}
+      <CalendarView
+        history={history}
+        lmpDate={lmpDate}
+        cycleLength={cycleLength}
+        todayKey={todayKey}
+        selectedDate={selectedDate}
+        onSelectDate={handleSelectDate}
+      />
 
       {/* Reset */}
       <button

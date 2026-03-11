@@ -8,7 +8,7 @@ export function getConceptionDate(lmpDate, cycleLength) {
   if (isNaN(lmp.getTime())) return lmpDate;
   const conception = new Date(lmp);
   conception.setDate(conception.getDate() + (cycleLength - 14));
-  return conception.toISOString().split('T')[0];
+  return buildDateKey(conception.getFullYear(), conception.getMonth(), conception.getDate());
 }
 
 export function getDaysOld(lmpDate, cycleLength) {
@@ -18,7 +18,7 @@ export function getDaysOld(lmpDate, cycleLength) {
   start.setHours(0, 0, 0, 0);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  return Math.max(0, Math.floor((today - start) / (1000 * 60 * 60 * 24)));
+  return Math.max(0, Math.round((today - start) / (1000 * 60 * 60 * 24)));
 }
 
 export function getDaysOldOn(dateKey, lmpDate, cycleLength) {
@@ -28,7 +28,7 @@ export function getDaysOldOn(dateKey, lmpDate, cycleLength) {
   start.setHours(0, 0, 0, 0);
   const day = new Date(dateKey + 'T00:00:00');
   day.setHours(0, 0, 0, 0);
-  return Math.max(0, Math.floor((day - start) / (1000 * 60 * 60 * 24)));
+  return Math.max(0, Math.round((day - start) / (1000 * 60 * 60 * 24)));
 }
 
 /**
@@ -44,7 +44,7 @@ export function getDueDate(lmpDate, cycleLength) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   due.setHours(0, 0, 0, 0);
-  const daysUntil = Math.ceil((due - today) / (1000 * 60 * 60 * 24));
+  const daysUntil = Math.round((due - today) / (1000 * 60 * 60 * 24));
   return {
     dateStr: due.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
     daysUntil,
@@ -53,7 +53,7 @@ export function getDueDate(lmpDate, cycleLength) {
 
 export function getTodayKey() {
   const today = new Date();
-  return today.toISOString().split('T')[0];
+  return buildDateKey(today.getFullYear(), today.getMonth(), today.getDate());
 }
 
 export function formatDate(dateStr) {
@@ -63,4 +63,18 @@ export function formatDate(dateStr) {
     month: 'short',
     day: 'numeric',
   });
+}
+
+export function getDaysInMonth(year, month) {
+  return new Date(year, month + 1, 0).getDate();
+}
+
+export function getFirstDayOfMonth(year, month) {
+  return new Date(year, month, 1).getDay();
+}
+
+export function buildDateKey(year, month, day) {
+  const m = String(month + 1).padStart(2, '0');
+  const d = String(day).padStart(2, '0');
+  return `${year}-${m}-${d}`;
 }
