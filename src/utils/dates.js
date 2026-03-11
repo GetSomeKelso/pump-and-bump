@@ -78,3 +78,45 @@ export function buildDateKey(year, month, day) {
   const d = String(day).padStart(2, '0');
   return `${year}-${m}-${d}`;
 }
+
+/**
+ * Returns a map of dateKey → { label, color, icon } for pregnancy milestones.
+ */
+export function getPregnancyMarkers(lmpDate, cycleLength) {
+  const conceptionStr = getConceptionDate(lmpDate, cycleLength);
+  const conception = new Date(conceptionStr + 'T00:00:00');
+  if (isNaN(conception.getTime())) return {};
+
+  function addDays(date, days) {
+    const d = new Date(date);
+    d.setDate(d.getDate() + days);
+    return d;
+  }
+
+  function toKey(date) {
+    return buildDateKey(date.getFullYear(), date.getMonth(), date.getDate());
+  }
+
+  const markers = {};
+
+  // Conception
+  markers[conceptionStr] = { label: 'Conception', color: '#8b5cf6', icon: '✦' };
+
+  // End of 1st trimester (12 weeks)
+  const tri1 = addDays(conception, 84);
+  markers[toKey(tri1)] = { label: '2nd Trimester', color: '#d97706', icon: '▸' };
+
+  // End of 2nd trimester / start of 3rd (27 weeks)
+  const tri2 = addDays(conception, 189);
+  markers[toKey(tri2)] = { label: '3rd Trimester', color: '#dc2626', icon: '▸' };
+
+  // Full term (37 weeks)
+  const fullTerm = addDays(conception, 259);
+  markers[toKey(fullTerm)] = { label: 'Full Term', color: '#16a34a', icon: '★' };
+
+  // Due date (38 weeks / 266 days)
+  const due = addDays(conception, 266);
+  markers[toKey(due)] = { label: 'Due Date', color: '#e11d48', icon: '♥' };
+
+  return markers;
+}

@@ -5,6 +5,7 @@ import {
   getDaysInMonth,
   getFirstDayOfMonth,
   buildDateKey,
+  getPregnancyMarkers,
 } from '../utils/dates.js';
 
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
@@ -18,14 +19,21 @@ export default function CalendarView({ history, lmpDate, cycleLength, todayKey, 
   const conceptionYear = parseInt(conceptionDate.slice(0, 4), 10);
   const conceptionMonth = parseInt(conceptionDate.slice(5, 7), 10) - 1;
 
+  const markers = getPregnancyMarkers(lmpDate, cycleLength);
+
   const currentYear = today.getFullYear();
   const currentMonth = today.getMonth();
+
+  // Allow navigating up to the due-date month so future milestones are visible
+  const lastMarkerKey = Object.keys(markers).sort().pop() || todayKey;
+  const lastMarkerYear = parseInt(lastMarkerKey.slice(0, 4), 10);
+  const lastMarkerMonth = parseInt(lastMarkerKey.slice(5, 7), 10) - 1;
 
   const font = "Georgia, 'Times New Roman', serif";
 
   /* ── Month navigation ── */
   const canGoPrev = viewYear > conceptionYear || (viewYear === conceptionYear && viewMonth > conceptionMonth);
-  const canGoNext = viewYear < currentYear || (viewYear === currentYear && viewMonth < currentMonth);
+  const canGoNext = viewYear < lastMarkerYear || (viewYear === lastMarkerYear && viewMonth < lastMarkerMonth);
 
   function prevMonth() {
     if (!canGoPrev) return;
@@ -76,7 +84,8 @@ export default function CalendarView({ history, lmpDate, cycleLength, todayKey, 
       const complete = goal > 0 && logged >= goal;
       const partial = goal > 0 && logged > 0 && logged < goal;
 
-      cells.push({ dayNum, dateKey, isDisabled, isToday, isSelected, goal, logged, complete, partial });
+      const marker = markers[dateKey] || null;
+      cells.push({ dayNum, dateKey, isDisabled, isToday, isSelected, goal, logged, complete, partial, marker });
     }
   }
 
@@ -153,7 +162,7 @@ export default function CalendarView({ history, lmpDate, cycleLength, todayKey, 
               return <div key={i} />;
             }
 
-            const { dayNum, dateKey, isDisabled, isToday, isSelected, complete, partial } = cell;
+            const { dayNum, dateKey, isDisabled, isToday, isSelected, complete, partial, marker } = cell;
 
             let bg = '#f7f7f2';
             let color = '#2a2e1f';
@@ -182,6 +191,7 @@ export default function CalendarView({ history, lmpDate, cycleLength, todayKey, 
                 onClick={() => !isDisabled && onSelectDate(dateKey)}
                 disabled={isDisabled}
                 aria-selected={isSelected}
+                title={marker ? marker.label : undefined}
                 className="flex flex-col items-center justify-center border-none cursor-pointer"
                 style={{
                   background: bg,
@@ -192,12 +202,30 @@ export default function CalendarView({ history, lmpDate, cycleLength, todayKey, 
                   width: '100%',
                   aspectRatio: '1',
                   borderRadius: '8px',
-                  outline: isToday && !isSelected ? '2px solid #556b2f' : 'none',
+                  outline: isToday && !isSelected
+                    ? '2px solid #556b2f'
+                    : marker && !isSelected
+                      ? `2px solid ${marker.color}`
+                      : 'none',
                   outlineOffset: '-2px',
                   cursor: isDisabled ? 'default' : 'pointer',
                   position: 'relative',
                 }}
               >
+                {marker && (
+                  <span
+                    style={{
+                      position: 'absolute',
+                      top: '1px',
+                      right: '3px',
+                      fontSize: '8px',
+                      lineHeight: 1,
+                      color: isSelected ? '#ffffff' : marker.color,
+                    }}
+                  >
+                    {marker.icon}
+                  </span>
+                )}
                 {dayNum}
                 {dotColor && (
                   <span
@@ -214,6 +242,29 @@ export default function CalendarView({ history, lmpDate, cycleLength, todayKey, 
               </button>
             );
           })}
+        </div>
+
+        {/* Milestone legend */}
+        <div
+          className="mt-3 pt-3 flex flex-wrap gap-x-3 gap-y-1"
+          style={{ borderTop: '1px solid #e8e7d9' }}
+        >
+          {[
+            { icon: '✦', label: 'Conception', color: '#8b5cf6' },
+            { icon: '▸', label: '2nd Tri', color: '#d97706' },
+            { icon: '▸', label: '3rd Tri', color: '#dc2626' },
+            { icon: '★', label: 'Full Term', color: '#16a34a' },
+            { icon: '♥', label: 'Due Date', color: '#e11d48' },
+          ].map((m) => (
+            <span
+              key={m.label}
+              className="flex items-center gap-1"
+              style={{ fontSize: '10px', color: '#6b6e5a', fontFamily: font }}
+            >
+              <span style={{ color: m.color, fontSize: '10px' }}>{m.icon}</span>
+              {m.label}
+            </span>
+          ))}
         </div>
       </div>
     </div>
