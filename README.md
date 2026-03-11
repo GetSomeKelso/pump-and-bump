@@ -1,14 +1,25 @@
-# Pump & Bump
+# 💪 Pump & Bump
 
-A simple web app that gives you a daily pushup goal based on how many days old your baby is (counted from conception). If your baby is 55 days old, your goal is 55 pushups that day. Log your reps throughout the day and watch your progress ring fill up.
+A dad-focused web app that gives you a daily pushup goal based on how many days old your baby is. If your baby is 55 days from conception, your goal is 55 pushups that day. Log your reps throughout the day, watch your progress ring fill up, and follow along with weekly developmental milestones.
 
 ## How It Works
 
-1. Enter your baby's conception date
-2. Each day, you'll see how many pushups to do (equal to the baby's age in days)
-3. Log pushups as you do them — they add up throughout the day
-4. Hit your goal and get a completion message
-5. Check your history to see how you've been doing
+1. Enter the **Last Menstrual Period (LMP) date** and **cycle length** (default is 28 days — adjust if her cycle is longer or shorter)
+2. The app estimates the conception date and calculates how old your baby is each day
+3. Your daily pushup goal = baby's age in days from conception
+4. Log pushups as you do them — they add up throughout the day
+5. Hit your goal and get a completion message
+6. Check your **estimated due date** countdown and **weekly milestone** facts about your baby's development
+7. Review your last 7 days of history to track your consistency
+
+## Features
+
+- **Adjustable cycle length** — Not every woman has a standard 28-day cycle. Slide to set 20–45 days and the app recalculates conception automatically
+- **Estimated due date** — See when your baby is expected to arrive with a day countdown
+- **Weekly milestones** — Fun developmental facts for each week of pregnancy (e.g. "Heart begins beating" at week 4)
+- **Progress ring** — Visual circular progress that fills as you log reps
+- **History tracker** — See your last 7 days with goal vs. actual reps
+- **Offline-ready** — All data stays in your browser (localStorage), nothing sent to a server
 
 ## Using the App
 
@@ -46,3 +57,9 @@ To stop the app, go back to the terminal and press `Ctrl + C`.
 ## Your Data
 
 All your data is saved in your browser only (localStorage). Nothing is sent to a server. If you clear your browser data, your history will be lost.
+
+## Tech Stack
+
+- [React](https://react.dev) + [Vite](https://vite.dev)
+- [Tailwind CSS v4](https://tailwindcss.com)
+- localStorage for persistence
