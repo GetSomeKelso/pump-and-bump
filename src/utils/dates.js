@@ -12,8 +12,7 @@ export function getConceptionDate(lmpDate, cycleLength) {
 }
 
 export function getDaysOld(lmpDate, cycleLength) {
-  const conceptionStr = getConceptionDate(lmpDate, cycleLength);
-  const start = new Date(conceptionStr + 'T00:00:00');
+  const start = new Date(lmpDate + 'T00:00:00');
   if (isNaN(start.getTime())) return 0;
   start.setHours(0, 0, 0, 0);
   const today = new Date();
@@ -22,8 +21,7 @@ export function getDaysOld(lmpDate, cycleLength) {
 }
 
 export function getDaysOldOn(dateKey, lmpDate, cycleLength) {
-  const conceptionStr = getConceptionDate(lmpDate, cycleLength);
-  const start = new Date(conceptionStr + 'T00:00:00');
+  const start = new Date(lmpDate + 'T00:00:00');
   if (isNaN(start.getTime())) return 0;
   start.setHours(0, 0, 0, 0);
   const day = new Date(dateKey + 'T00:00:00');

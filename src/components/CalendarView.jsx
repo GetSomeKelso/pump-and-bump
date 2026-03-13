@@ -21,9 +21,6 @@ export default function CalendarView({ history, lmpDate, cycleLength, todayKey, 
 
   const markers = getPregnancyMarkers(lmpDate, cycleLength);
 
-  const currentYear = today.getFullYear();
-  const currentMonth = today.getMonth();
-
   // Allow navigating up to the due-date month so future milestones are visible
   const lastMarkerKey = Object.keys(markers).sort().pop() || todayKey;
   const lastMarkerYear = parseInt(lastMarkerKey.slice(0, 4), 10);
@@ -73,21 +70,36 @@ export default function CalendarView({ history, lmpDate, cycleLength, todayKey, 
     } else {
       const dayNum = i - firstDay + 1;
       const dateKey = buildDateKey(viewYear, viewMonth, dayNum);
-      const isBeforeConception = dateKey < conceptionDate;
+      const isBeforeLmp = dateKey < lmpDate;
       const isFuture = dateKey > todayKey;
-      const isDisabled = isBeforeConception || isFuture;
       const isToday = dateKey === todayKey;
       const isSelected = dateKey === selectedDate;
 
-      const goal = isDisabled ? 0 : getDaysOldOn(dateKey, lmpDate, cycleLength);
+      const goal = isBeforeLmp ? 0 : getDaysOldOn(dateKey, lmpDate, cycleLength);
       const logged = history[dateKey]?.logged ?? 0;
-      const complete = goal > 0 && logged >= goal;
-      const partial = goal > 0 && logged > 0 && logged < goal;
+      const complete = !isFuture && goal > 0 && logged >= goal;
+      const partial = !isFuture && goal > 0 && logged > 0 && logged < goal;
 
       const marker = markers[dateKey] || null;
-      cells.push({ dayNum, dateKey, isDisabled, isToday, isSelected, goal, logged, complete, partial, marker });
+      cells.push({ dayNum, dateKey, isBeforeLmp, isFuture, isToday, isSelected, goal, logged, complete, partial, marker });
     }
   }
+
+  /* ── Milestones list sorted by date ── */
+  const milestoneList = Object.entries(markers)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([dateKey, m]) => {
+      const d = new Date(dateKey + 'T00:00:00');
+      const isPast = dateKey <= todayKey;
+      return {
+        dateKey,
+        label: m.label,
+        icon: m.icon,
+        color: m.color,
+        dateStr: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        isPast,
+      };
+    });
 
   return (
     <div className="w-full max-w-sm mx-auto mt-6">
@@ -162,7 +174,7 @@ export default function CalendarView({ history, lmpDate, cycleLength, todayKey, 
               return <div key={i} />;
             }
 
-            const { dayNum, dateKey, isDisabled, isToday, isSelected, complete, partial, marker } = cell;
+            const { dayNum, dateKey, isBeforeLmp, isFuture, isToday, isSelected, complete, partial, marker } = cell;
 
             let bg = '#f7f7f2';
             let color = '#2a2e1f';
@@ -172,9 +184,18 @@ export default function CalendarView({ history, lmpDate, cycleLength, todayKey, 
               bg = '#556b2f';
               color = '#ffffff';
               dotColor = complete ? '#a3d977' : partial ? '#d4c87a' : null;
-            } else if (isDisabled) {
+            } else if (isBeforeLmp) {
               bg = 'transparent';
               color = '#c2c1a5';
+            } else if (marker && isFuture) {
+              bg = marker.color + '20';
+              color = marker.color;
+            } else if (isFuture) {
+              bg = '#fafaf6';
+              color = '#a0a08e';
+            } else if (marker) {
+              bg = marker.color + '25';
+              color = '#2a2e1f';
             } else if (complete) {
               bg = '#e8efe0';
               color = '#3d5a1e';
@@ -188,8 +209,8 @@ export default function CalendarView({ history, lmpDate, cycleLength, todayKey, 
             return (
               <button
                 key={i}
-                onClick={() => !isDisabled && onSelectDate(dateKey)}
-                disabled={isDisabled}
+                onClick={() => !isBeforeLmp && !isFuture && onSelectDate(dateKey)}
+                disabled={isBeforeLmp}
                 aria-selected={isSelected}
                 title={marker ? marker.label : undefined}
                 className="flex flex-col items-center justify-center border-none cursor-pointer"
@@ -198,7 +219,7 @@ export default function CalendarView({ history, lmpDate, cycleLength, todayKey, 
                   color,
                   fontFamily: font,
                   fontSize: '13px',
-                  fontWeight: isToday || isSelected ? 'bold' : 'normal',
+                  fontWeight: isToday || isSelected || marker ? 'bold' : 'normal',
                   width: '100%',
                   aspectRatio: '1',
                   borderRadius: '8px',
@@ -208,7 +229,7 @@ export default function CalendarView({ history, lmpDate, cycleLength, todayKey, 
                       ? `2px solid ${marker.color}`
                       : 'none',
                   outlineOffset: '-2px',
-                  cursor: isDisabled ? 'default' : 'pointer',
+                  cursor: isBeforeLmp || isFuture ? 'default' : 'pointer',
                   position: 'relative',
                 }}
               >
@@ -216,9 +237,9 @@ export default function CalendarView({ history, lmpDate, cycleLength, todayKey, 
                   <span
                     style={{
                       position: 'absolute',
-                      top: '1px',
-                      right: '3px',
-                      fontSize: '8px',
+                      top: '0px',
+                      right: '2px',
+                      fontSize: '10px',
                       lineHeight: 1,
                       color: isSelected ? '#ffffff' : marker.color,
                     }}
@@ -264,6 +285,60 @@ export default function CalendarView({ history, lmpDate, cycleLength, todayKey, 
               <span style={{ color: m.color, fontSize: '10px' }}>{m.icon}</span>
               {m.label}
             </span>
+          ))}
+        </div>
+      </div>
+
+      {/* Upcoming milestones list */}
+      <div
+        className="rounded-xl p-4 mt-3"
+        style={{ background: '#fff', border: '1px solid #c2c1a5' }}
+      >
+        <h4
+          className="text-sm font-bold mb-2"
+          style={{ color: '#2a2e1f', fontFamily: font }}
+        >
+          Milestones
+        </h4>
+        <div className="flex flex-col gap-2">
+          {milestoneList.map((m) => (
+            <div
+              key={m.dateKey}
+              className="flex items-center gap-3"
+              style={{ opacity: m.isPast ? 0.5 : 1 }}
+            >
+              <span
+                className="flex items-center justify-center rounded-lg"
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  background: m.color + '20',
+                  color: m.color,
+                  fontSize: '16px',
+                  flexShrink: 0,
+                }}
+              >
+                {m.icon}
+              </span>
+              <div className="flex-1">
+                <span
+                  className="block text-sm font-bold"
+                  style={{ color: '#2a2e1f', fontFamily: font }}
+                >
+                  {m.label}
+                </span>
+                <span
+                  className="block text-xs"
+                  style={{ color: '#6b6e5a', fontFamily: font }}
+                >
+                  {m.dateStr}
+                  {m.isPast ? ' — reached' : ''}
+                </span>
+              </div>
+              {m.isPast && (
+                <span style={{ color: '#6b8f3c', fontSize: '14px' }}>✓</span>
+              )}
+            </div>
           ))}
         </div>
       </div>
