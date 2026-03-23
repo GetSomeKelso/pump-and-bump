@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { getDaysOld, getDaysOldOn, getDueDate, getTodayKey, formatDate } from '../utils/dates.js';
-import { getLoggedToday, addReps, setReps, getHistory, clearAll } from '../utils/storage.js';
+import { getDaysOld, getDaysOldOn, getDueDate, getTodayKey, formatDate, buildDateKey } from '../utils/dates.js';
+import { getLoggedToday, addReps, setReps, applyBackfill, getHistory, clearAll } from '../utils/storage.js';
 import { getMilestone } from '../data/milestones.js';
 import ProgressRing from './ProgressRing.jsx';
 import LogInput from './LogInput.jsx';
@@ -32,12 +32,37 @@ export default function Dashboard({ lmpDate, cycleLength, onReset, user, onLogou
 
   const target = daysOld;
   const viewLogged = isViewingToday ? logged : (history[viewingDate]?.logged ?? 0);
+  const viewBackfilled = history[viewingDate]?.backfilled ?? 0;
+  const directReps = Math.max(viewLogged - viewBackfilled, 0);
   const isComplete = viewLogged >= target && target > 0;
   const isDayZero = target === 0;
+
+  /* ── Set suggestion based on remaining reps ── */
+  function getSetSuggestion(remaining) {
+    if (remaining <= 20) return null;
+    let setSize;
+    if (remaining <= 50) setSize = 10;
+    else if (remaining <= 100) setSize = 15;
+    else if (remaining <= 150) setSize = 20;
+    else if (remaining <= 200) setSize = 25;
+    else if (remaining <= 250) setSize = 30;
+    else setSize = 35;
+    const fullSets = Math.floor(remaining / setSize);
+    const leftover = remaining % setSize;
+    if (leftover === 0) {
+      return `Try ${fullSets} sets of ${setSize} throughout the day`;
+    }
+    return `Try ${fullSets} x ${setSize} + 1 x ${leftover} throughout the day`;
+  }
+
+  const remaining = Math.max(target - viewLogged, 0);
+  const setSuggestion = getSetSuggestion(remaining);
 
   /* ── Handlers ── */
   function handleLog(reps) {
     addReps(viewingDate, reps);
+    const newLogged = getHistory()[viewingDate]?.logged ?? 0;
+    runBackfill(viewingDate, newLogged);
     if (isViewingToday) {
       setLogged(getLoggedToday(todayKey));
     }
@@ -45,16 +70,62 @@ export default function Dashboard({ lmpDate, cycleLength, onReset, user, onLogou
   }
 
   function handleEditStart() {
-    setEditValue(String(viewLogged));
+    setEditValue(String(directReps));
     setEditing(true);
+  }
+
+  function runBackfill(dateKey, newLogged) {
+    const dayTarget = dateKey === todayKey
+      ? getDaysOld(lmpDate, cycleLength)
+      : getDaysOldOn(dateKey, lmpDate, cycleLength);
+
+    if (newLogged > dayTarget && dayTarget > 0) {
+      let excess = newLogged - dayTarget;
+      const currentHistory = getHistory();
+      const backfillEntries = [];
+      let totalGave = 0;
+
+      const vd = new Date(dateKey + 'T00:00:00');
+      const lmpD = new Date(lmpDate + 'T00:00:00');
+      const d = new Date(vd);
+      d.setDate(d.getDate() - 1);
+
+      while (excess > 0 && d >= lmpD) {
+        const dk = buildDateKey(d.getFullYear(), d.getMonth(), d.getDate());
+        const dayGoal = getDaysOldOn(dk, lmpDate, cycleLength);
+        const existing = currentHistory[dk]?.logged ?? 0;
+
+        if (dayGoal > 0 && existing < dayGoal) {
+          const deficit = dayGoal - existing;
+          const fill = Math.min(deficit, excess);
+          const prevBackfill = currentHistory[dk]?.backfilled ?? 0;
+          backfillEntries.push({ dateKey: dk, logged: existing + fill, backfilled: prevBackfill + fill });
+          totalGave += fill;
+          excess -= fill;
+        }
+
+        d.setDate(d.getDate() - 1);
+      }
+
+      // Mark the source day with how many reps it gave away (keep full logged count)
+      if (totalGave > 0) {
+        const prevGave = currentHistory[dateKey]?.gave ?? 0;
+        backfillEntries.push({ dateKey, logged: newLogged, backfilled: currentHistory[dateKey]?.backfilled ?? 0, gave: prevGave + totalGave });
+        applyBackfill(backfillEntries);
+      }
+    }
   }
 
   function handleEditSave() {
     const val = parseInt(editValue, 10);
     if (!Number.isFinite(val) || val < 0) return;
-    setReps(viewingDate, val);
+    // Edit changes direct reps only; preserve backfill on top
+    const currentBackfill = history[viewingDate]?.backfilled ?? 0;
+    const newTotal = val + currentBackfill;
+    setReps(viewingDate, newTotal);
+    runBackfill(viewingDate, newTotal);
     if (isViewingToday) {
-      setLogged(val);
+      setLogged(getLoggedToday(todayKey));
     }
     setHistory(getHistory());
     setEditing(false);
@@ -189,10 +260,17 @@ export default function Dashboard({ lmpDate, cycleLength, onReset, user, onLogou
         ) : (
           <>
             {/* Progress Ring */}
-            <ProgressRing target={target} logged={viewLogged} />
+            <ProgressRing target={target} logged={viewLogged} backfilled={history[viewingDate]?.backfilled ?? 0} />
+
+            {/* Set Suggestion */}
+            {setSuggestion && !isComplete && (
+              <p className="text-sm italic mb-2" style={{ color: '#7d8068', fontFamily: font }}>
+                {setSuggestion}
+              </p>
+            )}
 
             {/* Stats Row */}
-            <div className="flex justify-center items-center gap-6 mb-4">
+            <div className="flex justify-center items-center gap-4 mb-4">
               <div className="text-center">
                 <span className="block font-bold" style={{ fontSize: '30px', color: '#2a2e1f', fontFamily: font }}>
                   {target}
@@ -245,17 +323,43 @@ export default function Dashboard({ lmpDate, cycleLength, onReset, user, onLogou
                     onClick={handleEditStart}
                     title="Click to edit"
                   >
-                    {viewLogged} <span style={{ fontSize: '14px', color: '#7d8068' }}>✎</span>
+                    {directReps} <span style={{ fontSize: '14px', color: '#7d8068' }}>✎</span>
                   </span>
                 )}
                 <span className="text-xs" style={{ color: '#6b6e5a', fontFamily: font }}>
                   Completed
                 </span>
               </div>
+              {(history[viewingDate]?.gave ?? 0) > 0 && (
+                <>
+                  <div style={{ width: '1px', height: '40px', background: '#c2c1a5' }} />
+                  <div className="text-center">
+                    <span className="block font-bold" style={{ fontSize: '30px', color: '#556b2f', fontFamily: font }}>
+                      {history[viewingDate].gave}
+                    </span>
+                    <span className="text-xs" style={{ color: '#6b6e5a', fontFamily: font }}>
+                      Shared
+                    </span>
+                  </div>
+                </>
+              )}
+              {(history[viewingDate]?.backfilled ?? 0) > 0 && (
+                <>
+                  <div style={{ width: '1px', height: '40px', background: '#c2c1a5' }} />
+                  <div className="text-center">
+                    <span className="block font-bold" style={{ fontSize: '30px', color: '#4a90c4', fontFamily: font }}>
+                      {history[viewingDate].backfilled}
+                    </span>
+                    <span className="text-xs" style={{ color: '#4a90c4', fontFamily: font }}>
+                      Received
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
 
-            {/* Log Input or Completion Banner */}
-            {isComplete ? (
+            {/* Completion Banner */}
+            {isComplete && (
               <div
                 className="rounded-xl px-4 py-4 mb-2"
                 style={{ background: '#e8efe0', border: '1px solid #6b8f3c' }}
@@ -265,17 +369,11 @@ export default function Dashboard({ lmpDate, cycleLength, onReset, user, onLogou
                     ? `🎉 Crushed it, Dad. That's ${viewLogged} reps for your little one.`
                     : `✓ ${viewLogged}/${target} reps completed`}
                 </p>
-                <button
-                  onClick={handleEditStart}
-                  className="mt-2 text-xs cursor-pointer bg-transparent border-none underline"
-                  style={{ color: '#3d5a1e', fontFamily: font }}
-                >
-                  Edit count
-                </button>
               </div>
-            ) : (
-              <LogInput onLog={handleLog} />
             )}
+
+            {/* Log Input — always visible so overflow can backfill missed days */}
+            <LogInput onLog={handleLog} />
           </>
         )}
       </div>
